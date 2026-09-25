@@ -75,9 +75,7 @@ test("a write-only setting whose name a reported property already carries is dro
         unit: "%",
       },
     ],
-    writeOnlySettings: [
-      { name: "ringtoneVolume", type: "number", min: 0, max: 100 },
-    ],
+    writeOnlySettings: [{ name: "ringtoneVolume", type: "number", min: 0, max: 100 }],
   };
   const specs = view.propertySpecs(dev);
   const rv = specs.filter((s) => s.name === "ringtoneVolume");
