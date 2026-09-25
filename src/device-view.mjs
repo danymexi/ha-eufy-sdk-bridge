@@ -17,7 +17,8 @@ export function createDeviceView(ctx) {
   async function describeDevice(sn) {
     const dev = await eufy.getDevice(sn);
     const m = dev.describe();
-    const isCamera = m.capabilities.includes("camera") || m.capabilities.includes("video");
+    const isCamera =
+      m.capabilities.includes("camera") || m.capabilities.includes("video");
     return {
       sn: m.sn,
       name: m.name, // owner's device name (e.g. "Dining room"), from device_name
@@ -35,7 +36,8 @@ export function createDeviceView(ctx) {
   /** Live property values as a flat `{ name: value }` map (reading schedules a background refresh). */
   function propertyState(dev) {
     const out = {};
-    for (const [name, pv] of Object.entries(dev.getProperties())) out[name] = pv.value;
+    for (const [name, pv] of Object.entries(dev.getProperties()))
+      out[name] = pv.value;
     return out;
   }
 
@@ -83,7 +85,12 @@ export function createDeviceView(ctx) {
   async function deviceList() {
     const devices = await eufy.getDevices();
     return Promise.all(
-      devices.map((d) => describeDevice(d.sn).catch((e) => ({ sn: d.sn, error: String(e?.message ?? e) }))),
+      devices.map((d) =>
+        describeDevice(d.sn).catch((e) => ({
+          sn: d.sn,
+          error: String(e?.message ?? e),
+        })),
+      ),
     );
   }
 

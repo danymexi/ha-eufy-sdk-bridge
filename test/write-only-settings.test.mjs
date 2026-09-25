@@ -6,11 +6,33 @@ import { createDeviceView } from "../src/device-view.mjs";
 function fakeDevice() {
   return {
     sn: "T8030TEST",
-    describe: () => ({ sn: "T8030TEST", name: "Base", model: "T8030", modelName: "HomeBase 3", codec: "station", capabilities: ["siren"] }),
+    describe: () => ({
+      sn: "T8030TEST",
+      name: "Base",
+      model: "T8030",
+      modelName: "HomeBase 3",
+      codec: "station",
+      capabilities: ["siren"],
+    }),
     getProperties: () => ({ promptVolume: { value: 26 } }),
-    properties: [{ name: "hubAlarmTone", type: "enum", writable: true, enumValues: { 0: "Tone1" } }],
+    properties: [
+      {
+        name: "hubAlarmTone",
+        type: "enum",
+        writable: true,
+        enumValues: { 0: "Tone1" },
+      },
+    ],
     writeOnlySettings: [
-      { name: "alarmVolume", type: "number", unit: "%", kind: "percent", min: 0, max: 100, description: "HomeBase alarm volume" },
+      {
+        name: "alarmVolume",
+        type: "number",
+        unit: "%",
+        kind: "percent",
+        min: 0,
+        max: 100,
+        description: "HomeBase alarm volume",
+      },
     ],
   };
 }
@@ -35,10 +57,27 @@ test("a write-only setting whose name a reported property already carries is dro
   const view = createDeviceView({ eufy: {}, state: { streaming: new Map() } });
   const dev = {
     sn: "T8214",
-    describe: () => ({ sn: "T8214", name: "Doorbell", model: "T8214", modelName: "Doorbell", codec: "camera", capabilities: [] }),
+    describe: () => ({
+      sn: "T8214",
+      name: "Doorbell",
+      model: "T8214",
+      modelName: "Doorbell",
+      codec: "camera",
+      capabilities: [],
+    }),
     getProperties: () => ({}),
-    properties: [{ name: "ringtoneVolume", type: "number", writable: true, kind: "percent", unit: "%" }],
-    writeOnlySettings: [{ name: "ringtoneVolume", type: "number", min: 0, max: 100 }],
+    properties: [
+      {
+        name: "ringtoneVolume",
+        type: "number",
+        writable: true,
+        kind: "percent",
+        unit: "%",
+      },
+    ],
+    writeOnlySettings: [
+      { name: "ringtoneVolume", type: "number", min: 0, max: 100 },
+    ],
   };
   const specs = view.propertySpecs(dev);
   const rv = specs.filter((s) => s.name === "ringtoneVolume");
