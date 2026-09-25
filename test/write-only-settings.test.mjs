@@ -30,3 +30,18 @@ test("propertySpecs appends write-only settings, marked writeOnly + writable, wi
   // A reported property carries no writeOnly flag.
   assert.equal(tone.writeOnly, undefined);
 });
+
+test("a write-only setting whose name a reported property already carries is dropped", () => {
+  const view = createDeviceView({ eufy: {}, state: { streaming: new Map() } });
+  const dev = {
+    sn: "T8214",
+    describe: () => ({ sn: "T8214", name: "Doorbell", model: "T8214", modelName: "Doorbell", codec: "camera", capabilities: [] }),
+    getProperties: () => ({}),
+    properties: [{ name: "ringtoneVolume", type: "number", writable: true, kind: "percent", unit: "%" }],
+    writeOnlySettings: [{ name: "ringtoneVolume", type: "number", min: 0, max: 100 }],
+  };
+  const specs = view.propertySpecs(dev);
+  const rv = specs.filter((s) => s.name === "ringtoneVolume");
+  assert.equal(rv.length, 1, "only one ringtoneVolume spec");
+  assert.equal(rv[0].writeOnly, undefined, "the reported one wins");
+});

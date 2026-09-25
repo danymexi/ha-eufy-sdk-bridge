@@ -58,18 +58,25 @@ export function createDeviceView(ctx) {
     // are not in `dev.properties` — that manifest is what the device reports — so a host would otherwise
     // never learn the control exists. Marked `writeOnly` so a frontend shows an optimistic control
     // (the device won't confirm the value) and drives it through the same `device.set` path.
-    const writeOnly = (dev.writeOnlySettings ?? []).map((p) => ({
-      name: p.name,
-      type: p.type,
-      unit: p.unit,
-      kind: p.kind,
-      writable: true,
-      writeOnly: true,
-      min: p.min,
-      max: p.max,
-      enumValues: p.enumValues,
-      description: p.description,
-    }));
+    // A device can declare a write-only setting whose name a reported property already carries (a
+    // doorbell reports `ringtoneVolume` AND accepts a write-only one). The reported spec wins — it has a
+    // live value — so a write-only is added only when the name is new, or a host builds two entities
+    // with the same unique id.
+    const reportedNames = new Set(reported.map((p) => p.name));
+    const writeOnly = (dev.writeOnlySettings ?? [])
+      .filter((p) => !reportedNames.has(p.name))
+      .map((p) => ({
+        name: p.name,
+        type: p.type,
+        unit: p.unit,
+        kind: p.kind,
+        writable: true,
+        writeOnly: true,
+        min: p.min,
+        max: p.max,
+        enumValues: p.enumValues,
+        description: p.description,
+      }));
     return [...reported, ...writeOnly];
   }
 
