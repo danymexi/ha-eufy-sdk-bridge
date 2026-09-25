@@ -45,7 +45,7 @@ export function createDeviceView(ctx) {
    * without knowing eufy wire ids. Wire-only fields (paramType, decode, aliases) are omitted.
    */
   function propertySpecs(dev) {
-    return (dev.properties ?? []).map((p) => ({
+    const reported = (dev.properties ?? []).map((p) => ({
       name: p.name,
       type: p.type, // "bool" | "number" | "string" | "enum"
       unit: p.unit, // "%", "°C", "dBm", …
@@ -54,6 +54,23 @@ export function createDeviceView(ctx) {
       enumValues: p.enumValues, // { raw: label } for enums
       description: p.description,
     }));
+    // Write-only settings a device ACCEPTS but never reports back (e.g. a HomeBase's alarm volume). They
+    // are not in `dev.properties` — that manifest is what the device reports — so a host would otherwise
+    // never learn the control exists. Marked `writeOnly` so a frontend shows an optimistic control
+    // (the device won't confirm the value) and drives it through the same `device.set` path.
+    const writeOnly = (dev.writeOnlySettings ?? []).map((p) => ({
+      name: p.name,
+      type: p.type,
+      unit: p.unit,
+      kind: p.kind,
+      writable: true,
+      writeOnly: true,
+      min: p.min,
+      max: p.max,
+      enumValues: p.enumValues,
+      description: p.description,
+    }));
+    return [...reported, ...writeOnly];
   }
 
   async function deviceList() {
