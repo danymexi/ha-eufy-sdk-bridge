@@ -79,6 +79,10 @@ export function loadConfig(env = process.env) {
     // instead of the one bundled here. Default ON to match existing behavior; set GO2RTC_ENABLE=0 to skip
     // spawning it.
     go2rtcEnable: env.GO2RTC_ENABLE == null ? true : truthy(env.GO2RTC_ENABLE),
+    // T9000 (HomeBase Professional) control channel: the mega shard the RTC signalling signs on when the
+    // SDK cannot derive it (e.g. `ie-pr`), and the ICE policy (`relay` default; never host-only).
+    rtcShard: env.BRIDGE_RTC_SHARD || undefined,
+    rtcIcePolicy: env.BRIDGE_RTC_ICE_POLICY || undefined,
     selfHost: env.BRIDGE_SELF_HOST || "127.0.0.1",
     // Cloud poll interval (ms). Unset → the SDK default (600000 = 10 min). Changeable live via the
     // config.set WS command. 0 disables polling.
