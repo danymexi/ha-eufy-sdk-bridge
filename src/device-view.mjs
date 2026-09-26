@@ -20,6 +20,9 @@ export function createDeviceView(ctx) {
     const isCamera = m.capabilities.includes("camera") || m.capabilities.includes("video");
     return {
       sn: m.sn,
+      // The station this device hangs off and its channel there (null for a station itself / unknown).
+      stationSn: dev.stationSn ?? m.stationSn ?? null,
+      channel: dev.channel ?? dev.raw?.device_channel ?? m.channel ?? null,
       name: m.name, // owner's device name (e.g. "Dining room"), from device_name
       model: m.model || m.modelName, // T-code (e.g. "T8410"); product name as fallback
       modelName: m.modelName, // product display name (e.g. "Indoor Cam Pan & Tilt")
