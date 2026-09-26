@@ -34,6 +34,15 @@ export function createHttpHandler(ctx) {
   // a stream that keeps opening "by itself" can be traced to the real viewer (an HA card, a recording,
   // a WebRTC/HLS client) rather than the go2rtc ffmpeg the bridge sees. Best-effort: on any error (go2rtc
   // disabled / not ready) the immediate-requester line already logged is the fallback.
+  /** Whether `sn` hangs off a HomeBase Professional (T9000) — its live has no P2P and no stream client. */
+  async function isOnT9000(sn) {
+    const devs = await eufy.getDevices();
+    const dev = devs.find((d) => d.sn === sn);
+    if (!dev?.stationSn || dev.stationSn === dev.sn) return false;
+    const station = devs.find((d) => d.sn === dev.stationSn);
+    return /^T9000/i.test(station?.model ?? "");
+  }
+
   const lastConsumerLog = new Map(); // sn -> ts of the last probe
   async function logStreamConsumers(sn) {
     try {
@@ -235,7 +244,10 @@ export function createHttpHandler(ctx) {
           error: `stream backing off after a failed open — retry in ${Math.ceil(backoff / 1000)}s (P2P unreachable)`,
         });
       try {
-        const client = await openStreamClient(sn, cfg); // its OWN P2P session — see streams.mjs
+        // A camera on a HomeBase Professional (T9000) streams over the station's control channel, which
+        // admits ONE session per account — so it must ride the main client's session, never a second one.
+        const onT9000 = await isOnT9000(sn);
+        const client = onT9000 ? eufy : await openStreamClient(sn, cfg); // its OWN P2P session — see streams.mjs
         const cam = (await client.getDevice(sn)).camera?.();
         if (!cam?.openReadable) return json(res, 404, { error: "no live video on this device" });
         // The battery budget only takes effect when this call opens the session, which it does: the stream
@@ -247,7 +259,7 @@ export function createHttpHandler(ctx) {
         streaming.add(sn);
         activeStreams.set(sn, { feed, startedAt: Date.now() });
         rtspLastActive.set(sn, Date.now()); // a live stream counts as activity for the rtspStream auto-off
-        res.writeHead(200, { "content-type": "video/H264", "cache-control": "no-cache" });
+        res.writeHead(200, { "content-type": onT9000 ? "video/H265" : "video/H264", "cache-control": "no-cache" });
         feed.pipe(res);
         // Remember the stream's latest keyframe so the still can show what was last SEEN, not only the
         // last event — without ever waking the camera for it (see live-still.mjs).
@@ -266,7 +278,7 @@ export function createHttpHandler(ctx) {
         return;
       } catch (e) {
         ctx.noteStreamFailure?.(sn); // arm backoff so the next go2rtc retry doesn't wake the radio again
-        dropClient(sn); // never reuse a session that just failed — see dropStreamClient in streams.mjs
+        if (!(await isOnT9000(sn).catch(() => false))) dropClient(sn); // never reuse a session that just failed — see dropStreamClient in streams.mjs
         return json(res, 502, { error: String(e?.message ?? e) });
       }
     }

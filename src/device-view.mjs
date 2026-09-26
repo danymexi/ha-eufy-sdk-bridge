@@ -14,6 +14,13 @@ export function createDeviceView(ctx) {
    * T-code, `modelName` is the product. A host shows `name` as the device name and `model`/`modelName`
    * as its model — no cross-referencing the device list.
    */
+  /** The camera's channel on its station, from the registry record (the device model does not carry it). */
+  async function channelOf(sn) {
+    const raw = (await eufy.getDevices()).find((d) => d.sn === sn)?.raw?.device_channel;
+    const n = Number(raw);
+    return raw !== undefined && raw !== null && Number.isInteger(n) ? n : null;
+  }
+
   async function describeDevice(sn) {
     const dev = await eufy.getDevice(sn);
     const m = dev.describe();
@@ -22,7 +29,7 @@ export function createDeviceView(ctx) {
       sn: m.sn,
       // The station this device hangs off and its channel there (null for a station itself / unknown).
       stationSn: dev.stationSn ?? m.stationSn ?? null,
-      channel: dev.channel ?? dev.raw?.device_channel ?? m.channel ?? null,
+      channel: await channelOf(sn),
       name: m.name, // owner's device name (e.g. "Dining room"), from device_name
       model: m.model || m.modelName, // T-code (e.g. "T8410"); product name as fallback
       modelName: m.modelName, // product display name (e.g. "Indoor Cam Pan & Tilt")

@@ -26,6 +26,7 @@ export async function writeGo2rtcConfig(cfg, devices) {
     '  listen: ":8555"',
     "streams:",
   ];
+  const stationModel = (d) => devices.find((x) => x.sn === d.stationSn)?.model ?? "";
   for (const d of cams) {
     // A stream id per camera serial; the source is this bridge's own HTTP feed.
     // `#async` makes ffmpeg stamp frames from the wall clock (-use_wallclock_as_timestamps 1 -async 1)
@@ -33,7 +34,10 @@ export async function writeGo2rtcConfig(cfg, devices) {
     // reads as a broken stream: Home Assistant aborts with "Timestamp discontinuity detected: last dts =
     // 0, dts = 4219155056" seconds after the picture starts flowing. Re-stamping costs nothing here —
     // the feed is remuxed, not transcoded, and a live view has no timeline to preserve.
-    lines.push(`  ${d.sn}: ffmpeg:http://${cfg.selfHost}:${cfg.port}/stream/${d.sn}#video=copy#async`);
+    // A T9000 camera arrives as HEVC over the station's control channel; transcode to H.264 so every
+    // consumer (HA's camera card included) can play it. Everything else is passed through untouched.
+    const video = /^T9000/i.test(stationModel(d)) ? "h264" : "copy";
+    lines.push(`  ${d.sn}: ffmpeg:http://${cfg.selfHost}:${cfg.port}/stream/${d.sn}#video=${video}#async`);
   }
   const yaml = lines.join("\n") + "\n";
   await mkdir(dirname(cfg.go2rtcConfig), { recursive: true }).catch(() => {});
