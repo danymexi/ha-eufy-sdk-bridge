@@ -14,14 +14,24 @@ export function createDeviceView(ctx) {
    * T-code, `modelName` is the product. A host shows `name` as the device name and `model`/`modelName`
    * as its model — no cross-referencing the device list.
    */
-  /** The camera's channel on its station, from the registry record (the device model does not carry it). */
-  async function channelOf(sn) {
-    const raw = (await eufy.getDevices()).find((d) => d.sn === sn)?.raw?.device_channel;
+  /** A registry record's `device_channel` as an integer, or null when absent/unparseable. */
+  function channelFromRaw(raw) {
     const n = Number(raw);
     return raw !== undefined && raw !== null && Number.isInteger(n) ? n : null;
   }
 
-  async function describeDevice(sn) {
+  /** The camera's channel on its station, from the registry record (the device model does not carry it). */
+  async function channelOf(sn) {
+    return channelFromRaw((await eufy.getDevices()).find((d) => d.sn === sn)?.raw?.device_channel);
+  }
+
+  /**
+   * `channel` may be passed in by a caller that already holds the registry (the device list),
+   * so describing 32 devices costs ONE `getDevices()` rather than one per device — the per-device
+   * lookup made `devices.list` take ~7 s, and HA's 15 s poll timeout then tripped under any extra
+   * load, marking every entity unavailable.
+   */
+  async function describeDevice(sn, channel) {
     const dev = await eufy.getDevice(sn);
     const m = dev.describe();
     const isCamera = m.capabilities.includes("camera") || m.capabilities.includes("video");
@@ -29,7 +39,7 @@ export function createDeviceView(ctx) {
       sn: m.sn,
       // The station this device hangs off and its channel there (null for a station itself / unknown).
       stationSn: dev.stationSn ?? m.stationSn ?? null,
-      channel: await channelOf(sn),
+      channel: channel !== undefined ? channel : await channelOf(sn),
       name: m.name, // owner's device name (e.g. "Dining room"), from device_name
       model: m.model || m.modelName, // T-code (e.g. "T8410"); product name as fallback
       modelName: m.modelName, // product display name (e.g. "Indoor Cam Pan & Tilt")
@@ -92,9 +102,11 @@ export function createDeviceView(ctx) {
 
   async function deviceList() {
     const devices = await eufy.getDevices();
+    // One registry read for the whole list: hand each device its channel instead of re-reading.
+    const channelBySn = new Map(devices.map((d) => [d.sn, channelFromRaw(d?.raw?.device_channel)]));
     return Promise.all(
       devices.map((d) =>
-        describeDevice(d.sn).catch((e) => ({
+        describeDevice(d.sn, channelBySn.get(d.sn)).catch((e) => ({
           sn: d.sn,
           error: String(e?.message ?? e),
         })),

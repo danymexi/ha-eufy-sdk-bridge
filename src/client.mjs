@@ -12,7 +12,7 @@ import { EufyMega, FileSessionStore, FileFcmStore, ConsoleLogger } from "@mega-y
  * got `p2pConnect` and nothing else, never the `[p2p] <sn> <<< …` frames.
  */
 export function createEufy({ cfg, DEBUG_P2P }) {
-  return new EufyMega({
+  const eufy = new EufyMega({
     email: cfg.email,
     password: cfg.password,
     countryCode: cfg.country,
@@ -33,4 +33,37 @@ export function createEufy({ cfg, DEBUG_P2P }) {
     prewarmEvents: cfg.prewarm ? undefined : [],
     logger: DEBUG_P2P ? new ConsoleLogger() : undefined,
   });
+  memoizeGetDevice(eufy);
+  return eufy;
+}
+
+/**
+ * One live Device per serial, shared by every caller.
+ *
+ * The SDK's `getDevice(sn)` rebuilds the whole device model on EVERY call — it awaits the first
+ * realtime state, re-reads the registry, rebuilds the command context and re-binds every capability
+ * — about 1–2 s per device. `devices.list` described 32 devices that way on every host poll (~6.5 s),
+ * and under any extra load (a burst of arming pushes each triggering a refresh) it overran the host's
+ * 15 s poll timeout, marking every entity unavailable for a full poll interval.
+ *
+ * Caching is safe because the SDK delivers realtime updates to the *latest* Device it handed out for
+ * a serial (`liveDevices` holds a WeakRef to it); with every caller sharing this one object it stays
+ * the live target and keeps receiving pushes and background refreshes. The cache is dropped on every
+ * successful (re-)login (`eufy.forgetDevices()`), since a fresh session rebinds command sinks.
+ */
+function memoizeGetDevice(eufy) {
+  const cache = new Map(); // sn -> Promise<Device>
+  const real = eufy.getDevice.bind(eufy);
+  eufy.getDevice = (sn) => {
+    let p = cache.get(sn);
+    if (!p) {
+      p = real(sn).catch((e) => {
+        cache.delete(sn); // don't pin a failed resolution
+        throw e;
+      });
+      cache.set(sn, p);
+    }
+    return p;
+  };
+  eufy.forgetDevices = () => cache.clear();
 }
