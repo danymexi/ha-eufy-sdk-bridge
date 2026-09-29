@@ -51,11 +51,7 @@ export function createWsServer(ctx, httpServer) {
 
   async function handleMessage(ws, raw) {
     let msg;
-    try {
-      msg = JSON.parse(raw.toString());
-    } catch {
-      return send(ws, { ok: false, error: "bad json" });
-    }
+    try { msg = JSON.parse(raw.toString()); } catch { return send(ws, { ok: false, error: "bad json" }); }
     const { id, cmd } = msg;
     if (DEBUG) {
       const bits = [`cmd=${cmd}`];
@@ -68,9 +64,7 @@ export function createWsServer(ctx, httpServer) {
     const fail = (error) => send(ws, { id, ok: false, error: String(error?.message ?? error) });
     // Reject a bad request by throwing — the outer catch renders it as { ok:false, error }, the same
     // client-visible result as `return fail(...)`, so the shared guards below don't thread a return.
-    const reject = (message) => {
-      throw new Error(message);
-    };
+    const reject = (message) => { throw new Error(message); };
     try {
       // Anker Solix control commands (table above) all share the same enable + target-device guards, so
       // dispatch them here instead of repeating those two lines in ~10 near-identical switch cases.
@@ -116,10 +110,8 @@ export function createWsServer(ctx, httpServer) {
         }
 
         // ── device control (require auth — gated above) ──
-        case "devices.list":
-          return reply({ devices: await ctx.deviceList() });
-        case "device.state":
-          return reply({ device: await ctx.describeDevice(msg.sn) });
+        case "devices.list": return reply({ devices: await ctx.deviceList() });
+        case "device.state": return reply({ device: await ctx.describeDevice(msg.sn) });
         case "device.properties": {
           const dev = await eufy.getDevice(msg.sn);
           return reply({ sn: msg.sn, properties: ctx.propertySpecs(dev) });
@@ -131,9 +123,7 @@ export function createWsServer(ctx, httpServer) {
             await eufy.setProperty(msg.sn, msg.name, msg.value);
             dbg(`device.set OK sn=${msg.sn} name=${msg.name} (${Date.now() - t0}ms)`);
           } catch (e) {
-            console.error(
-              `[bridge] device.set FAILED sn=${msg.sn} name=${msg.name} (${Date.now() - t0}ms): ${e?.name ?? "Error"}: ${e?.message ?? e}`,
-            );
+            console.error(`[bridge] device.set FAILED sn=${msg.sn} name=${msg.name} (${Date.now() - t0}ms): ${e?.name ?? "Error"}: ${e?.message ?? e}`);
             throw e; // outer catch surfaces it to the frontend (+ triggers session recovery if kicked)
           }
           return reply({});
@@ -147,7 +137,13 @@ export function createWsServer(ctx, httpServer) {
           const args = Array.isArray(msg.args) ? msg.args : [];
           const dev = await eufy.getDevice(msg.sn);
           // Capability surfaces that expose actions. Add more accessors here as needed.
-          const surfaces = [dev.smartLight?.(), dev.camera?.(), dev.lock?.(), dev.siren?.()].filter(Boolean);
+          const surfaces = [
+            dev.smartLight?.(),
+            dev.camera?.(),
+            dev.lock?.(),
+            dev.siren?.(),
+            dev.ptz?.()
+          ].filter(Boolean);
           const surface = surfaces.find((s) => typeof s?.[action] === "function");
           if (!surface) return fail(`no action '${action}' on ${msg.sn}`);
           const t0 = Date.now();
@@ -157,9 +153,7 @@ export function createWsServer(ctx, httpServer) {
             dbg(`device.action OK ${action} sn=${msg.sn} (${Date.now() - t0}ms)`);
             return reply({ result: result ?? null });
           } catch (e) {
-            console.error(
-              `[bridge] device.action FAILED ${action} sn=${msg.sn} (${Date.now() - t0}ms): ${e?.name ?? "Error"}: ${e?.message ?? e}`,
-            );
+            console.error(`[bridge] device.action FAILED ${action} sn=${msg.sn} (${Date.now() - t0}ms): ${e?.name ?? "Error"}: ${e?.message ?? e}`);
             throw e;
           }
         }
@@ -208,16 +202,12 @@ export function createWsServer(ctx, httpServer) {
             http: `http://${cfg.selfHost}:${cfg.port}/stream/${msg.sn}`,
             rtsp: `rtsp://${cfg.selfHost}:8554/${msg.sn}`,
           });
-        case "stream.stop":
-          return reply({}); // advisory; the media connection is the real signal
+        case "stream.stop": return reply({}); // advisory; the media connection is the real signal
 
         default:
           return fail(`unknown cmd: ${cmd}`);
       }
-    } catch (e) {
-      if (e?.name === "SessionExpiredError") ctx.maybeRecoverSession();
-      return fail(e);
-    }
+    } catch (e) { if (e?.name === "SessionExpiredError") ctx.maybeRecoverSession(); return fail(e); }
   }
 
   return { send, broadcast, handleMessage };
